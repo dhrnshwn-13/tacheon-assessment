@@ -119,6 +119,8 @@ GROUP BY source_name
 ORDER BY article_count DESC
 LIMIT 10;
 ```
+**Output:**
+![Query 1](screenshots/query_1.png)
 
 ### Breaking news summary
 
@@ -131,7 +133,35 @@ SELECT
 FROM `affable-framing-464607-b9.news_pipeline.articles`
 GROUP BY is_breaking_news;
 ```
+**Output:**
+![Query 2](screenshots/query_2.png)
 
+### Query 3: Articles by Category
+```sql
+SELECT
+    category,
+    COUNT(*) AS article_count,
+    ROUND(AVG(reading_time_seconds), 0) AS avg_reading_time_seconds,
+    COUNTIF(is_breaking_news = TRUE) AS breaking_news_count
+FROM `affable-framing-464607-b9.news_pipeline.articles`
+WHERE category IS NOT NULL AND category != ''
+GROUP BY category
+ORDER BY article_count DESC;
+```
+**Output:**
+![Query 3](screenshots/query_3.png)
+
+### Query 4: Daily Ingestion Trend
+```sql
+SELECT
+    DATE(ingested_at) AS ingestion_date,
+    COUNT(*) AS articles_ingested
+FROM `affable-framing-464607-b9.news_pipeline.articles`
+GROUP BY ingestion_date
+ORDER BY ingestion_date DESC;
+```
+**Output:**
+![Query 4](screenshots/query_4.png)
 ---
 
 ## Running in Production
