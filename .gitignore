@@ -1,0 +1,11 @@
+# Google Cloud credentials
+*.json
+service-account*.json
+
+# Python
+__pycache__/
+*.pyc
+.env
+
+# VSCode
+.vscode/
