@@ -33,7 +33,29 @@ def ensure_table_exists(client: bigquery.Client):
         raise
 
     # Define the table schema
-    table = bigquery.Table(TABLE_REF, schema=get_schema())
+    schema = [
+        bigquery.SchemaField("article_id",            "STRING",    mode="REQUIRED"),
+        bigquery.SchemaField("title",                 "STRING",    mode="NULLABLE"),
+        bigquery.SchemaField("description",           "STRING",    mode="NULLABLE"),
+        bigquery.SchemaField("source_name",           "STRING",    mode="NULLABLE"),
+        bigquery.SchemaField("source_url",            "STRING",    mode="NULLABLE"),
+        bigquery.SchemaField("author",                "STRING",    mode="NULLABLE"),
+        bigquery.SchemaField("language",              "STRING",    mode="NULLABLE"),
+        bigquery.SchemaField("country",               "STRING",    mode="NULLABLE"),
+        bigquery.SchemaField("category",              "STRING",    mode="NULLABLE"),
+        bigquery.SchemaField("keywords",              "STRING",    mode="NULLABLE"),
+        bigquery.SchemaField("image_url",             "STRING",    mode="NULLABLE"),
+        bigquery.SchemaField("published_at",          "STRING",    mode="NULLABLE"),
+
+        # Derived fields
+        bigquery.SchemaField("reading_time_seconds",  "INTEGER",   mode="NULLABLE"),
+        bigquery.SchemaField("is_breaking_news",      "BOOLEAN",   mode="NULLABLE"),
+        bigquery.SchemaField("has_image",             "BOOLEAN",   mode="NULLABLE"),
+        bigquery.SchemaField("has_description",       "BOOLEAN",   mode="NULLABLE"),
+        bigquery.SchemaField("ingested_at",           "STRING",    mode="NULLABLE"),
+    ]
+
+    table = bigquery.Table(TABLE_REF, schema=schema)
 
     try:
         client.create_table(table, exists_ok=True)
@@ -42,58 +64,26 @@ def ensure_table_exists(client: bigquery.Client):
         logger.error(f"Failed to create table: {e}")
         raise
 
-def get_schema():
-    return [
-        bigquery.SchemaField("article_id",            "STRING"),
-        bigquery.SchemaField("title",                 "STRING"),
-        bigquery.SchemaField("description",           "STRING"),
-        bigquery.SchemaField("source_name",           "STRING"),
-        bigquery.SchemaField("source_url",            "STRING"),
-        bigquery.SchemaField("author",                "STRING"),
-        bigquery.SchemaField("language",              "STRING"),
-        bigquery.SchemaField("country",               "STRING"),
-        bigquery.SchemaField("category",              "STRING"),
-        bigquery.SchemaField("keywords",              "STRING"),
-        bigquery.SchemaField("image_url",             "STRING"),
-        bigquery.SchemaField("published_at",          "STRING"),
-        bigquery.SchemaField("reading_time_seconds",  "INTEGER"),
-        bigquery.SchemaField("is_breaking_news",      "BOOLEAN"),
-        bigquery.SchemaField("has_image",             "BOOLEAN"),
-        bigquery.SchemaField("has_description",       "BOOLEAN"),
-        bigquery.SchemaField("ingested_at",           "STRING"),
-    ]
 
 def load_to_bigquery(articles: list[dict]) -> bool:
+    """
+    Loads transformed articles into BigQuery.
+    Returns True if successful, False otherwise.
+    """
     if not articles:
         logger.warning("No articles to load into BigQuery.")
         return False
 
     try:
-        import csv, tempfile, os
         client = get_bq_client()
         ensure_table_exists(client)
 
-        # Write articles to a temporary CSV file
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False, newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=articles[0].keys())
-            writer.writeheader()
-            writer.writerows(articles)
-            tmp_path = f.name
+        # Insert rows into BigQuery
+        errors = client.insert_rows_json(TABLE_REF, articles)
 
-        # Load CSV into BigQuery using a batch load job
-        job_config = bigquery.LoadJobConfig(
-            source_format=bigquery.SourceFormat.CSV,
-            skip_leading_rows=1,
-            autodetect=False,
-            schema=get_schema(),
-            write_disposition=bigquery.WriteDisposition.WRITE_APPEND,
-        )
-
-        with open(tmp_path, "rb") as f:
-            job = client.load_table_from_file(f, TABLE_REF, job_config=job_config)
-
-        job.result()  # Wait for the job to complete
-        os.remove(tmp_path)  # Clean up temp file
+        if errors:
+            logger.error(f"BigQuery insert errors: {errors}")
+            return False
 
         logger.info(f"Successfully loaded {len(articles)} articles into '{TABLE_REF}'.")
         return True
