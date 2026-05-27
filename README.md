@@ -162,6 +162,7 @@ ORDER BY ingestion_date DESC;
 ```
 **Output:**
 ![Query 4](screenshots/query_4.png)
+
 ---
 
 ## Running in Production
